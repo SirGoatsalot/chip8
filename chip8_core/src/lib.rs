@@ -1,3 +1,5 @@
+use core::num;
+
 use rand::random;
 
 pub const SCREEN_WIDTH: usize = 64;
@@ -121,21 +123,21 @@ impl Emu {
                 self.push(self.pc);
                 self.pc = nnn;
             }, 
-            (3, _, _, _) => { // 3XNN Skip if VX == 0xNN
+            (3, _, _, _) => { // 3XNN skip if VX == 0xNN
                 let x = digit2 as usize;
                 let nn = (op & 0xFF) as u8;
                 if self.v_reg[x] == nn {
                     self.pc += 2;
                 }
             },
-            (4, _, _, _) => { // 4XNN Skip if VX != 0xNN
+            (4, _, _, _) => { // 4XNN skip if VX != 0xNN
                 let x = digit2 as usize;
                 let nn = (op & 0xFF) as u8;
                 if self.v_reg[x] != nn {
                     self.pc += 2;
                 }
             },
-            (5, _, _, 0) => { // 5XY0 Skip if VX == VY
+            (5, _, _, 0) => { // 5XY0 skip if VX == VY
                 let x = digit2 as usize;
                 let y = digit3 as usize;
                 if self.v_reg[x] == self.v_reg[y] {
@@ -249,12 +251,9 @@ impl Emu {
                 let vy = self.v_reg[y]; // & (SCREEN_HEIGHT as u8);
                 let mut coords = vy as usize * (SCREEN_WIDTH as usize) + vx as usize;
                 
-                for row in 0..n {
-                    let byte = self.ram[sprite_addr];
-                    println!("{byte}");
-                    
-                    for column in (0..8).rev().map(|n| (byte >> n) & 1) {
-                        let bit = column;
+                for _row in 0..n {
+                    let byte = self.ram[sprite_addr];                
+                    for bit in (0..8).rev().map(|n| (byte >> n) & 1) {
                         print!("{bit}");
                         self.screen[coords] = if bit == 1 {true} else {false};
                         coords += 1;
@@ -263,6 +262,54 @@ impl Emu {
                     sprite_addr += 1;
                     coords += SCREEN_WIDTH - 7;
                 }
+            },
+            (0xE, _, 9, 0xE) => { // EX9E skip if key vx is pressed
+                let x = digit2 as usize;
+                let vx = self.v_reg[x];
+                if self.keys[vx as usize] {
+                    self.pc += 2;
+                }
+            },
+            (0xE, _, 0xA, 1) => { // EX9E skip if key vx is pressed
+                let x = digit2 as usize;
+                let vx = self.v_reg[x];
+                if !self.keys[vx as usize] {
+                    self.pc += 2;
+                }
+            },
+            (0xF, _, 0, 7) => { // FX07 set VX to delay timer
+                let x = digit2 as usize;
+                self.v_reg[x] = self.dt;
+            },
+            (0xF, _, 1, 5) => { // FX15 set delay timer to VX
+                let x = digit2 as usize;
+                self.dt = self.v_reg[x];
+            },
+            (0xF, _, 1, 8) => { // FX18 set sound timer to VX
+                let x = digit2 as usize;
+                self.st = self.v_reg[x];
+            },
+            (0xF, _, 1, 0xE) => { // FX1E I += VX
+                let x = digit2 as usize;
+                self.st = self.v_reg[x];
+            },
+            (0xF, _, 0, 0xA) => { // FX0A Get Key
+                let x = digit2 as usize;
+                let mut key_pressed = false;
+                for key in 0..NUM_KEYS {
+                    if self.keys[key] {
+                        self.v_reg[x] = key as u8;
+                        key_pressed = true;
+                    }
+                }
+                if !key_pressed {
+                    self.pc -= 2;
+                }
+            },
+            (0xF, _, 2, 9) => { // FX29 Font Character
+                let x = digit2 as usize;
+                let character = self.v_reg[x];
+                self.i_reg = (character * 5) as u16;
             },
             (_, _, _, _) => unimplemented!("Unimplemented opcode: {}", op),
         }
