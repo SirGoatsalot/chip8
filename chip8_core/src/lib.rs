@@ -1,3 +1,5 @@
+use rand::random;
+
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
 
@@ -24,7 +26,7 @@ const FONTSET: [u8; FONTSET_SIZE] = [
     0xF0, 0x80, 0x80, 0x80, 0xF0, // C
     0xE0, 0x90, 0x90, 0x90, 0xE0, // D
     0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-    0xF0, 0x80, 0xF0, 0x80, 0x80 // F
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 ];
 
 pub struct Emu {
@@ -55,8 +57,30 @@ impl Emu {
             st: 0,
         };
 
-        new_emu.ram[..FONTSET_SIZE].copy_from_slice(&FONTSET);
+        new_emu.ram[0..FONTSET_SIZE].copy_from_slice(&FONTSET);
         new_emu
+    }
+
+    pub fn test_execute(&mut self, op: u16) {
+        println!("\nExecuting {0}", op);
+        self.execute(op);
+        println!("i_reg: {0}", self.i_reg);
+        println!("v_reg[1]: {0}", self.v_reg[1]);
+        println!("v_reg[2]: {0}", self.v_reg[2]);
+        let mut column = 0;
+        for pixel in self.screen {
+            if pixel {
+                print!("█");
+            } else {
+                print!("_");
+            }
+            column += 1;
+            if column > SCREEN_WIDTH {
+                print!("\n");
+                column = 0;
+            }
+
+        }
     }
 
     pub fn tick(&mut self) {
@@ -86,8 +110,8 @@ impl Emu {
         
         match (digit1, digit2, digit3, digit4) {
             (0, 0, 0, 0) => return, // 0000 No-op 
-            (0, 0, 14, 0) => self.screen = [false; SCREEN_HEIGHT * SCREEN_WIDTH], // 00E0 Clear screen
-            (0, 0, 14, 14) => self.pc = self.pop(), // 00EE Return from subroutine
+            (0, 0, 0xE, 0) => self.screen = [false; SCREEN_HEIGHT * SCREEN_WIDTH], // 00E0 Clear screen
+            (0, 0, 0xE, 0xE) => self.pc = self.pop(), // 00EE Return from subroutine
             (1, _, _, _) => { // 1NNN Jump to address 0xNNN
                 let nnn = op & 0xFFF;
                 self.pc = nnn;
@@ -192,7 +216,7 @@ impl Emu {
                 self.v_reg[x] = new_vx;
                 self.v_reg[0xF] = new_vf;
             },
-            (8, _, _, 14) => { // 8XYE VX <<= VY; store dropped bit in VF
+            (8, _, _, 0xE) => { // 8XYE VX <<= VY; store dropped bit in VF
                 let x = digit2 as usize;
 
                 let lsb = self.v_reg[x] & 1;
@@ -200,9 +224,46 @@ impl Emu {
                 self.v_reg[0xF] = lsb;
 
             },
-            (10, _, _, _) => { // ANNN Set index register I to value NNN
-
+            (0xA, _, _, _) => { // ANNN Set index register I to value NNN
+                let nnn = op & 0xFFF;
+                self.i_reg = nnn;
             }, 
+            (0xB, _, _, _) => { // BNNN Jump to V0 + 0xNNN
+                let nnn = op & 0xFFF;
+                self.pc = (self.v_reg[0] as u16) + nnn;
+            }, 
+            (0xC, _, _, _) => { // CXNN  VX = rand() & 0xNN
+                let x = digit2 as usize;
+                let nn = (op & 0xFF) as u8;
+                let rng: u8 = random();
+                self.v_reg[x] = rng & nn;
+            },
+            (0xD, _, _, _) => { // DXYN Draws Sprite
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                let n = digit4 as u8;
+                
+                self.v_reg[0xF] = 0;
+                let mut sprite_addr = self.i_reg as usize;
+                let vx = self.v_reg[x]; // & (SCREEN_WIDTH as u8);
+                let vy = self.v_reg[y]; // & (SCREEN_HEIGHT as u8);
+                let mut coords = vy as usize * (SCREEN_WIDTH as usize) + vx as usize;
+                
+                for row in 0..n {
+                    let byte = self.ram[sprite_addr];
+                    println!("{byte}");
+                    
+                    for column in (0..8).rev().map(|n| (byte >> n) & 1) {
+                        let bit = column;
+                        print!("{bit}");
+                        self.screen[coords] = if bit == 1 {true} else {false};
+                        coords += 1;
+                    }
+                    print!("\n");
+                    sprite_addr += 1;
+                    coords += SCREEN_WIDTH - 7;
+                }
+            },
             (_, _, _, _) => unimplemented!("Unimplemented opcode: {}", op),
         }
     } 
