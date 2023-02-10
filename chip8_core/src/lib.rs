@@ -1,5 +1,3 @@
-use core::num;
-
 use rand::random;
 
 pub const SCREEN_WIDTH: usize = 64;
@@ -64,25 +62,28 @@ impl Emu {
     }
 
     pub fn test_execute(&mut self, op: u16) {
-        println!("\nExecuting {0}", op);
+        println!("\nExecuting {:X?}", op);
         self.execute(op);
-        println!("i_reg: {0}", self.i_reg);
+        println!("i_reg: {:0?}", self.i_reg);
+        let i = self.i_reg as usize;
+        println!("RAM[{3}]: {0}, {1}, {2}", self.ram[i], self.ram[i + 1], self.ram[i + 2], self.i_reg);
         println!("v_reg[1]: {0}", self.v_reg[1]);
         println!("v_reg[2]: {0}", self.v_reg[2]);
-        let mut column = 0;
-        for pixel in self.screen {
-            if pixel {
-                print!("█");
-            } else {
-                print!("_");
-            }
-            column += 1;
-            if column > SCREEN_WIDTH {
-                print!("\n");
-                column = 0;
-            }
+        println!("v_reg[3]: {0}", self.v_reg[3]);
+        // let mut column = 0;
+        // for pixel in self.screen {
+        //     if pixel {
+        //         print!("█");
+        //     } else {
+        //         print!("_");
+        //     }
+        //     column += 1;
+        //     if column > SCREEN_WIDTH {
+        //         print!("\n");
+        //         column = 0;
+        //     }
 
-        }
+        // }
     }
 
     pub fn tick(&mut self) {
@@ -270,7 +271,7 @@ impl Emu {
                     self.pc += 2;
                 }
             },
-            (0xE, _, 0xA, 1) => { // EX9E skip if key vx is pressed
+            (0xE, _, 0xA, 1) => { // EXA1 skip if key vx is not pressed
                 let x = digit2 as usize;
                 let vx = self.v_reg[x];
                 if !self.keys[vx as usize] {
@@ -310,6 +311,46 @@ impl Emu {
                 let x = digit2 as usize;
                 let character = self.v_reg[x];
                 self.i_reg = (character * 5) as u16;
+            },
+            (0xF, _, 3, 3) => { // FX33 Binary-coded decimal conversion
+                let x = digit2 as usize;
+                let vx = self.v_reg[x];
+
+                let hundreds = vx / 100;
+                let tens = (vx - (hundreds * 100)) / 10;
+                let ones = vx - (hundreds * 100) - (tens * 10); 
+
+                let start_addr = self.i_reg as usize;
+                println!("{vx}: {hundreds}-{tens}-{ones}");
+                match (hundreds, tens, ones) {
+                    (0, 0, 0) => self.ram[start_addr] = 0,
+                    (0, 0, _) => self.ram[start_addr] = ones,
+                    (0, _, _) => {
+                        self.ram[start_addr] = tens;
+                        self.ram[start_addr + 1] = ones;
+                    },
+                    (_, _, _) => {
+                        self.ram[start_addr] = hundreds;
+                        self.ram[start_addr + 1] = tens;
+                        self.ram[start_addr + 2] = ones;
+                    },
+                }
+            },
+            (0xF, _, 5, 5) => { // FX55 Store memory
+                let x = digit2 as usize;
+                let mut addr = self.i_reg as usize;
+                for register in 0..=x {
+                    self.ram[addr] = self.v_reg[register];
+                    addr += 1;
+                }
+            },
+            (0xF, _, 6, 5) => { // FX65 Load memory
+                let x = digit2 as usize;
+                let mut addr = self.i_reg as usize;
+                for register in 0..=x {
+                    self.v_reg[register] = self.ram[addr];
+                    addr += 1;
+                }
             },
             (_, _, _, _) => unimplemented!("Unimplemented opcode: {}", op),
         }
