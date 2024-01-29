@@ -50,12 +50,18 @@ fn main() {
                 Event::Quit{..} => {
                     break 'gameloop;
                 },
-                Event::KeyDown { timestamp, window_id, keycode, scancode, keymod, repeat } => {
+                Event::KeyDown { timestamp: _, window_id: _, keycode, scancode: _, keymod: _, repeat: _ } => {
                     match keycode {
                         Some(code) => set_key(&mut chip8, code, true),
                         None => ()
                     }
                 },
+                Event::KeyUp { timestamp: _, window_id: _, keycode, scancode: _, keymod: _, repeat: _ } => {
+                    match keycode {
+                        Some(code) => set_key(&mut chip8, code, false),
+                        None => ()
+                    }
+                }
                 _ => ()
             }
         }
