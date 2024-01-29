@@ -74,7 +74,7 @@ impl Emu {
         }
         if self.st > 0 {
             if self.st == 1 {
-                // BEEP
+                println!("B E E P");
             };
             self.st -= 1;
         }
@@ -92,7 +92,6 @@ impl Emu {
         let start = START_ADDR as usize;
         let end = (START_ADDR as usize) + data.len();
         self.ram[start..end].copy_from_slice(data);
-        println!("{:X?}", self.ram);
     }
 
     fn execute(&mut self, op: u16) {
@@ -311,7 +310,6 @@ impl Emu {
                 let ones = vx - (hundreds * 100) - (tens * 10); 
 
                 let start_addr = self.i_reg as usize;
-                println!("{vx}: {hundreds}-{tens}-{ones}");
                 match (hundreds, tens, ones) {
                     (0, 0, 0) => self.ram[start_addr] = 0,
                     (0, 0, _) => self.ram[start_addr] = ones,

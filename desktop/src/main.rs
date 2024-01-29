@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::Read;
 
 use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
@@ -45,10 +46,15 @@ fn main() {
 
     'gameloop: loop {
         for evt in event_pump.poll_iter() {
-
             match evt {
                 Event::Quit{..} => {
                     break 'gameloop;
+                },
+                Event::KeyDown { timestamp, window_id, keycode, scancode, keymod, repeat } => {
+                    match keycode {
+                        Some(code) => set_key(&mut chip8, code, true),
+                        None => ()
+                    }
                 },
                 _ => ()
             }
@@ -78,4 +84,26 @@ fn draw_screen(emu: &mut chip8_core::Emu, canvas: &mut Canvas<Window>) {
         }
     }
     canvas.present();
+}
+
+fn set_key(emu: &mut chip8_core::Emu, keycode: Keycode, pressed: bool) {
+    match keycode {
+        Keycode::Kp0 => emu.keypress(0, pressed),
+        Keycode::Kp1 => emu.keypress(1, pressed),
+        Keycode::Kp2 => emu.keypress(2, pressed),
+        Keycode::Kp3 => emu.keypress(3, pressed),
+        Keycode::Kp4 => emu.keypress(4, pressed),
+        Keycode::Kp5 => emu.keypress(5, pressed),
+        Keycode::Kp6 => emu.keypress(6, pressed),
+        Keycode::Kp7 => emu.keypress(7, pressed),
+        Keycode::Kp8 => emu.keypress(8, pressed),
+        Keycode::Kp9 => emu.keypress(9, pressed),
+        Keycode::KpDivide => emu.keypress(0xA, pressed),
+        Keycode::KpMultiply => emu.keypress(0xB, pressed),
+        Keycode::KpMinus => emu.keypress(0xC, pressed),
+        Keycode::KpPlus => emu.keypress(0xD, pressed),
+        Keycode::KpEnter => emu.keypress(0xE, pressed),
+        Keycode::KpPeriod => emu.keypress(0xC, pressed),
+        _ => println!("Invalid Keypre!: {}", keycode)
+    }
 }
