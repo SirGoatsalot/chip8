@@ -61,31 +61,6 @@ impl Emu {
         new_emu
     }
 
-    pub fn test_execute(&mut self, op: u16) {
-        println!("\nExecuting {:X?}", op);
-        self.execute(op);
-        println!("i_reg: {:0?}", self.i_reg);
-        let i = self.i_reg as usize;
-        println!("RAM[{3}]: {0}, {1}, {2}", self.ram[i], self.ram[i + 1], self.ram[i + 2], self.i_reg);
-        println!("v_reg[1]: {0}", self.v_reg[1]);
-        println!("v_reg[2]: {0}", self.v_reg[2]);
-        println!("v_reg[3]: {0}", self.v_reg[3]);
-        // let mut column = 0;
-        // for pixel in self.screen {
-        //     if pixel {
-        //         print!("█");
-        //     } else {
-        //         print!("_");
-        //     }
-        //     column += 1;
-        //     if column > SCREEN_WIDTH {
-        //         print!("\n");
-        //         column = 0;
-        //     }
-
-        // }
-    }
-
     pub fn tick(&mut self) {
         // Fetch
         let op = self.fetch();
@@ -103,6 +78,21 @@ impl Emu {
             };
             self.st -= 1;
         }
+    }
+
+    pub fn get_display(&mut self) -> &[bool] {
+        &self.screen
+    }
+
+    pub fn keypress(&mut self, idx: usize, pressed: bool) {
+        self.keys[idx] = pressed;
+    }
+
+    pub fn load(&mut self, data: &[u8]) {
+        let start = START_ADDR as usize;
+        let end = (START_ADDR as usize) + data.len();
+        self.ram[start..end].copy_from_slice(data);
+        println!("{:X?}", self.ram);
     }
 
     fn execute(&mut self, op: u16) {
@@ -160,7 +150,7 @@ impl Emu {
             (7, _, _, _) => { // 7XNN VX += 0xNN
                 let x = digit2 as usize;
                 let nn = (op & 0xFF) as u8;
-                self.v_reg[x] += nn;
+                self.v_reg[x] = self.v_reg[x].wrapping_add(nn);
             },
             (8, _, _, 0) => { // 8XY0 VX = VY
                 let x = digit2 as usize;
@@ -261,7 +251,7 @@ impl Emu {
                     }
                     print!("\n");
                     sprite_addr += 1;
-                    coords += SCREEN_WIDTH - 7;
+                    coords += SCREEN_WIDTH - 8;
                 }
             },
             (0xE, _, 9, 0xE) => { // EX9E skip if key vx is pressed
@@ -352,7 +342,7 @@ impl Emu {
                     addr += 1;
                 }
             },
-            (_, _, _, _) => unimplemented!("Unimplemented opcode: {}", op),
+            (_, _, _, _) => unimplemented!("Unimplemented opcode: {:X?}", op),
         }
     } 
 
